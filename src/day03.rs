@@ -72,10 +72,8 @@ impl Schematic {
             return None;
         }
 
-        let x_range = x.saturating_sub(1)..(x + len + 1).min(self.columns);
-        let y_range = y.saturating_sub(1)..(y + 2).min(self.rows);
-        if x_range
-            .cartesian_product(y_range)
+        if (x.saturating_sub(1)..(x + len + 1).min(self.columns))
+            .cartesian_product(y.saturating_sub(1)..(y + 2).min(self.rows))
             .any(|(xs, ys)| SYMBOLS.contains(&self[(xs, ys)]))
         {
             return Some((num, len));
@@ -88,36 +86,31 @@ impl Schematic {
             return None;
         }
 
-        let (x, y) = xy;
-        let x_range = x.saturating_sub(1)..(x + 2).min(self.columns);
-        let y_range = y.saturating_sub(1)..(y + 2).min(self.rows);
-        let mut remaining_checks = x_range
-            .cartesian_product(y_range)
+        let mut remaining_checks = (xy.0.saturating_sub(1)..(xy.0 + 2).min(self.columns))
+            .cartesian_product(xy.1.saturating_sub(1)..(xy.1 + 2).min(self.rows))
             .collect::<Vec<(usize, usize)>>();
         let mut ratios: Vec<u32> = Vec::new();
 
-        while let Some(xy_check) = remaining_checks.pop() {
-            if !self[xy_check].is_ascii_digit() {
+        while let Some(xy_c) = remaining_checks.pop() {
+            if !self[xy_c].is_ascii_digit() {
                 continue;
             }
 
-            let (xc, yc) = xy_check;
-            let mut xstart = xc;
-            let mut xend = xc;
+            let mut xstart = xy_c.0;
+            let mut xend = xy_c.0;
 
-            while xend != self.rows && self[(xend, yc)].is_ascii_digit() {
+            while xend != self.rows && self[(xend, xy_c.1)].is_ascii_digit() {
                 xend += 1;
-                try_remove_coords(&mut remaining_checks, (xend, yc));
-            }
-            while xstart != 0 {
-                if !self[(xstart - 1, yc)].is_ascii_digit() {
-                    break;
-                }
-                xstart -= 1;
-                try_remove_coords(&mut remaining_checks, (xstart, yc));
+                try_remove_coords(&mut remaining_checks, (xend, xy_c.1));
             }
 
-            let num: u32 = self.data[(yc * self.columns + xstart)..(yc * self.columns + xend)]
+            while xstart != 0 && self[(xstart - 1, xy_c.1)].is_ascii_digit() {
+                xstart -= 1;
+                try_remove_coords(&mut remaining_checks, (xstart, xy_c.1));
+            }
+
+            let num: u32 = self.data
+                [(xy_c.1 * self.columns + xstart)..(xy_c.1 * self.columns + xend)]
                 .iter()
                 .fold(0, |acc, c| acc * 10 + c.to_digit(10).unwrap());
             ratios.push(num);
@@ -133,16 +126,14 @@ impl Schematic {
 impl Index<(usize, usize)> for Schematic {
     type Output = char;
 
-    fn index(&self, index: (usize, usize)) -> &char {
-        let (col, row) = index;
-        &self.data[row * self.columns + col]
+    fn index(&self, xy: (usize, usize)) -> &char {
+        &self.data[xy.0 + xy.1 * self.columns]
     }
 }
 
 impl IndexMut<(usize, usize)> for Schematic {
-    fn index_mut(&mut self, index: (usize, usize)) -> &mut char {
-        let (col, row) = index;
-        &mut self.data[row * self.columns + col]
+    fn index_mut(&mut self, xy: (usize, usize)) -> &mut char {
+        &mut self.data[xy.0 + xy.1 * self.columns]
     }
 }
 
